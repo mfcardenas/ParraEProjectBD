@@ -1,0 +1,11 @@
+{
+ "twitter-location" :
+ 	{"properties" :
+ 		{
+ 			"hashtag": {"type": "string"},
+ 			"followers_count": {"type": "integer"},
+ 			"count": {"type": "integer"},
+ 			"location": {"type": "geo_point"}
+ 		}
+ 	}
+ }
