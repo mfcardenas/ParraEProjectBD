@@ -25,104 +25,110 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class WEParraDataTwitter {
-  public static void main(String[] args) throws Exception {
-    final ParameterTool params = ParameterTool.fromArgs(args);
-    final Properties properties = new Properties();
-    properties.setProperty(TwitterSource.CONSUMER_KEY, "");
-    properties.setProperty(TwitterSource.CONSUMER_SECRET, "");
-    properties.setProperty(TwitterSource.TOKEN, "");
-    properties.setProperty(TwitterSource.TOKEN_SECRET, "");
+    public static void main(String[] args) throws Exception {
+        final ParameterTool params = ParameterTool.fromArgs(args);
+        final Properties properties = new Properties();
 
-    final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-    env.getConfig().setGlobalJobParameters(params);
-    env.setParallelism(params.getInt("parallelism", 1));
+        properties.setProperty(TwitterSource.CONSUMER_KEY, "");
+        properties.setProperty(TwitterSource.CONSUMER_SECRET, "");
+        properties.setProperty(TwitterSource.TOKEN, "");
+        properties.setProperty(TwitterSource.TOKEN_SECRET, "");
 
-    final DataStream<String> streamSource = env.addSource(new TwitterSource(properties));
-    DataStream<Tuple5<String, Integer, Double, Double, Integer>> dataStream =
-        streamSource.flatMap(new HashtagTokenizeFlatMap()).keyBy(0).sum(4);
-    dataStream.print();
+        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().setGlobalJobParameters(params);
+        env.setParallelism(params.getInt("parallelism", 1));
 
-    Map<String, String> config = new HashMap<>();
-    // This instructs the sink to emit after every element, otherwise they would be buffered
-    config.put("bulk.flush.max.actions", "10");
-    config.put("cluster.name", "elasticsearch");
+        final DataStream<String> streamSource = env.addSource(new TwitterSource(properties));
+        DataStream<Tuple5<String, Integer, Double, Double, Integer>> dataStream =
+                streamSource.flatMap(new HashtagTokenizeFlatMap()).keyBy(0).sum(4);
+        dataStream.print();
 
-    List<InetSocketAddress> transports = new ArrayList<>();
-    transports.add(new InetSocketAddress(InetAddress.getByName("localhost"), 9300));
+        Map<String, String> config = new HashMap<>();
+        // Esto instruye al receptor para que emita después de cada elemento, de lo contrario, se almacenarían en el búfer
+        config.put("bulk.flush.max.actions", "10");
+        config.put("cluster.name", "elasticsearch");
 
-    dataStream.addSink(new ElasticsearchSink<>(config, transports, new TwitterInserter()));
+        List<InetSocketAddress> transports = new ArrayList<>();
+        transports.add(new InetSocketAddress(InetAddress.getByName("localhost"), 9300));
 
-    env.execute("Tweet streaming");
-  }
+        dataStream.addSink(new ElasticsearchSink<>(config, transports, new TwitterInserter()));
 
-  public static class HashtagTokenizeFlatMap
-      implements FlatMapFunction<String, Tuple5<String, Integer, Double, Double, Integer>> {
-    private static final long serialVersionUID = 1L;
-    private transient ObjectMapper jsonParser;
+        env.execute("Flujo Tweets");
+    }
+
+    public static class HashtagTokenizeFlatMap
+            implements FlatMapFunction<String, Tuple5<String, Integer, Double, Double, Integer>> {
+        private static final long serialVersionUID = 1L;
+        private transient ObjectMapper jsonParser;
+
+        /**
+         * Parsear el fichero JSON para analizar su información y procesar los campos correspondientes.
+         */
+        @Override
+        public void flatMap(String value, Collector<Tuple5<String, Integer, Double, Double, Integer>> out)
+                throws Exception {
+            if (jsonParser == null) {
+                jsonParser = new ObjectMapper();
+            }
+            JsonNode jsonNode = jsonParser.readValue(value, JsonNode.class);
+            if (value.contains("created_at")) {//filter delete record tweet
+                final boolean hasHashtags = jsonNode.get("entities").get("hashtags").size() > 0;
+                //https://dev.twitter.com/overview/api/tweets#obj-coordinates
+                final boolean hasGeoCoordinates = jsonNode.get("geo").has("coordinates");
+                final boolean hasCoordinatesCoordinates =
+                        !jsonNode.get("coordinates").isNull() && jsonNode.get("coordinates").get("coordinates").size() > 0;
+                if (hasHashtags && (hasGeoCoordinates || hasCoordinatesCoordinates)) {
+                    final double latitude = hasGeoCoordinates ? jsonNode.get("geo").get("coordinates").get(0).asDouble() :
+                            jsonNode.get("coordinates").get("coordinates").get(1).asDouble();
+                    final double longitude = hasGeoCoordinates ? jsonNode.get("geo").get("coordinates").get(1).asDouble() :
+                            jsonNode.get("coordinates").get("coordinates").get(0).asDouble();
+                    for (int i = 0; i < jsonNode.get("entities").get("hashtags").size(); i++) {
+                        StringTokenizer tokenizer =
+                                new StringTokenizer(jsonNode.get("entities").get("hashtags").get(i).get("text").asText());
+                        while (tokenizer.hasMoreTokens()) {
+                            String result = tokenizer.nextToken().replaceAll("\\s*", "").toLowerCase();
+                            int followersCount = 0;
+                            if (jsonNode.get("user").has("followers_count")) {
+                                followersCount = jsonNode.get("user").get("followers_count").asInt(0);
+                            }
+                            if (!result.equals("")) {
+                                out.collect(new Tuple5<>(result, followersCount, latitude, longitude, 1));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /**
-     * Select the language from the incoming JSON text
+     * Crear los indices.
      */
-    @Override
-    public void flatMap(String value, Collector<Tuple5<String, Integer, Double, Double, Integer>> out)
-        throws Exception {
-      if (jsonParser == null) {
-        jsonParser = new ObjectMapper();
-      }
-      JsonNode jsonNode = jsonParser.readValue(value, JsonNode.class);
-      if (value.contains("created_at")) {//filter delete record tweet
-        final boolean hasHashtags = jsonNode.get("entities").get("hashtags").size() > 0;
-        //https://dev.twitter.com/overview/api/tweets#obj-coordinates
-        final boolean hasGeoCoordinates = jsonNode.get("geo").has("coordinates");
-        final boolean hasCoordinatesCoordinates =
-            !jsonNode.get("coordinates").isNull() && jsonNode.get("coordinates").get("coordinates").size() > 0;
-        if (hasHashtags && (hasGeoCoordinates || hasCoordinatesCoordinates)) {
-          final double latitude = hasGeoCoordinates ? jsonNode.get("geo").get("coordinates").get(0).asDouble() :
-              jsonNode.get("coordinates").get("coordinates").get(1).asDouble();
-          final double longitude = hasGeoCoordinates ? jsonNode.get("geo").get("coordinates").get(1).asDouble() :
-              jsonNode.get("coordinates").get("coordinates").get(0).asDouble();
-          for (int i = 0; i < jsonNode.get("entities").get("hashtags").size(); i++) {
-            StringTokenizer tokenizer =
-                new StringTokenizer(jsonNode.get("entities").get("hashtags").get(i).get("text").asText());
-            while (tokenizer.hasMoreTokens()) {
-              String result = tokenizer.nextToken().replaceAll("\\s*", "").toLowerCase();
-              int followersCount = 0;
-              if (jsonNode.get("user").has("followers_count")) {
-                followersCount = jsonNode.get("user").get("followers_count").asInt(0);
-              }
-              if (!result.equals("")) {
-                out.collect(new Tuple5<>(result, followersCount, latitude, longitude,1));
-              }
-            }
-          }
+    public static class TwitterInserter
+            implements ElasticsearchSinkFunction<Tuple5<String, Integer, Double, Double, Integer>> {
+
+        /**
+         * Construir el indice con los datos de Flink
+         *
+         * @param record
+         * @param ctx
+         * @param indexer
+         */
+        @Override
+        public void process(Tuple5<String, Integer, Double, Double, Integer> record, RuntimeContext ctx,
+                            RequestIndexer indexer) {
+            // construct JSON document to index
+            Map<String, String> json = new HashMap<>();
+            json.put("hashtag", record.f0);                                         // hashtag
+            json.put("followers_count", record.f1.toString());                      // followers count
+            json.put("location", record.f2 + "," + record.f3);                      // lat,lon pair
+            json.put("count", record.f4.toString());                                //count of the hashtag
+            IndexRequest rqst = Requests.indexRequest().index("parra-twits")        // index name
+                    .type("twitter-location")                                           // mapping name
+                    .source(json);
+
+            System.out.println(json.toString());
+            indexer.add(rqst);
         }
-      }
     }
-  }
-
-  /**
-   * Inserts popular places into the "nyc-places" index.
-   */
-  public static class TwitterInserter
-      implements ElasticsearchSinkFunction<Tuple5<String, Integer, Double, Double, Integer>> {
-
-    // construct index request
-    @Override
-    public void process(Tuple5<String, Integer, Double, Double,  Integer> record, RuntimeContext ctx,
-                        RequestIndexer indexer) {
-
-      // construct JSON document to index
-      Map<String, String> json = new HashMap<>();
-      json.put("hashtag", record.f0);      // hashtag
-      json.put("followers_count", record.f1.toString());          // followers count
-      json.put("location", record.f2 + "," + record.f3);  // lat,lon pair
-      json.put("count", record.f4.toString()); //count of the hashtag
-      IndexRequest rqst = Requests.indexRequest().index("flink-twits")        // index name
-          .type("twitter-location")  // mapping name
-          .source(json);
-
-      System.out.println(json.toString());
-      indexer.add(rqst);
-    }
-  }
 }

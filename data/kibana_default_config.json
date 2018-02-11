@@ -1,9 +1,9 @@
 [
   {
-    "_id": "flink-twits",
+    "_id": "parra-twits",
     "_type": "dashboard",
     "_source": {
-      "title": "flink twits",
+      "title": "parra twits",
       "hits": 0,
       "description": "",
       "panelsJSON": "[{\"id\":\"geo\",\"type\":\"visualization\",\"panelIndex\":1,\"size_x\":6,\"size_y\":8,\"col\":1,\"row\":1},{\"id\":\"bar-maxcount\",\"type\":\"visualization\",\"panelIndex\":2,\"size_x\":6,\"size_y\":6,\"col\":1,\"row\":9},{\"id\":\"bar-followers\",\"type\":\"visualization\",\"panelIndex\":3,\"size_x\":5,\"size_y\":8,\"col\":7,\"row\":1},{\"id\":\"bar-counthashtag\",\"type\":\"visualization\",\"panelIndex\":4,\"size_x\":5,\"size_y\":6,\"col\":7,\"row\":9}]",
@@ -26,7 +26,7 @@
       "description": "",
       "version": 1,
       "kibanaSavedObjectMeta": {
-        "searchSourceJSON": "{\"index\":\"flink-twits\",\"query\":{\"query_string\":{\"query\":\"*\",\"analyze_wildcard\":true}},\"filter\":[]}"
+        "searchSourceJSON": "{\"index\":\"parra-twits\",\"query\":{\"query_string\":{\"query\":\"*\",\"analyze_wildcard\":true}},\"filter\":[]}"
       }
     }
   },
@@ -40,7 +40,7 @@
       "description": "",
       "version": 1,
       "kibanaSavedObjectMeta": {
-        "searchSourceJSON": "{\"index\":\"flink-twits\",\"query\":{\"query_string\":{\"query\":\"*\",\"analyze_wildcard\":true}},\"filter\":[]}"
+        "searchSourceJSON": "{\"index\":\"parra-twits\",\"query\":{\"query_string\":{\"query\":\"*\",\"analyze_wildcard\":true}},\"filter\":[]}"
       }
     }
   },
@@ -54,7 +54,7 @@
       "description": "",
       "version": 1,
       "kibanaSavedObjectMeta": {
-        "searchSourceJSON": "{\"index\":\"flink-twits\",\"query\":{\"query_string\":{\"query\":\"*\",\"analyze_wildcard\":true}},\"filter\":[]}"
+        "searchSourceJSON": "{\"index\":\"parra-twits\",\"query\":{\"query_string\":{\"query\":\"*\",\"analyze_wildcard\":true}},\"filter\":[]}"
       }
     }
   },
@@ -68,7 +68,7 @@
       "description": "",
       "version": 1,
       "kibanaSavedObjectMeta": {
-        "searchSourceJSON": "{\"index\":\"flink-twits\",\"query\":{\"query_string\":{\"query\":\"*\",\"analyze_wildcard\":true}},\"filter\":[]}"
+        "searchSourceJSON": "{\"index\":\"parra-twits\",\"query\":{\"query_string\":{\"query\":\"*\",\"analyze_wildcard\":true}},\"filter\":[]}"
       }
     }
   }
