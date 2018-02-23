@@ -1,12 +1,5 @@
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.StringTokenizer;
-
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.api.java.tuple.Tuple5;
@@ -20,19 +13,26 @@ import org.apache.flink.streaming.connectors.twitter.TwitterSource;
 import org.apache.flink.util.Collector;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Requests;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.util.*;
 
 public class WEParraDataTwitter {
+
+    private static Logger logger = LoggerFactory.getLogger(WEParraDataTwitter.class);
+    private static Utils obj = new Utils();
+
     public static void main(String[] args) throws Exception {
         final ParameterTool params = ParameterTool.fromArgs(args);
         final Properties properties = new Properties();
 
-        properties.setProperty(TwitterSource.CONSUMER_KEY, "");
-        properties.setProperty(TwitterSource.CONSUMER_SECRET, "");
-        properties.setProperty(TwitterSource.TOKEN, "");
-        properties.setProperty(TwitterSource.TOKEN_SECRET, "");
+        properties.setProperty(TwitterSource.CONSUMER_KEY,obj.getKey("twitter.consumerKey"));
+        properties.setProperty(TwitterSource.CONSUMER_SECRET,obj.getKey("twitter.consumerSecret"));
+        properties.setProperty(TwitterSource.TOKEN,obj.getKey("twitter.token"));
+        properties.setProperty(TwitterSource.TOKEN_SECRET,obj.getKey("twitter.secret"));
 
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.getConfig().setGlobalJobParameters(params);
@@ -53,7 +53,7 @@ public class WEParraDataTwitter {
 
         dataStream.addSink(new ElasticsearchSink<>(config, transports, new TwitterInserter()));
 
-        env.execute("Flujo Tweets");
+        env.execute("Flujo Tweets WEParra");
     }
 
     public static class HashtagTokenizeFlatMap
@@ -108,11 +108,10 @@ public class WEParraDataTwitter {
             implements ElasticsearchSinkFunction<Tuple5<String, Integer, Double, Double, Integer>> {
 
         /**
-         * Construir el indice con los datos de Flink
          *
-         * @param record
-         * @param ctx
-         * @param indexer
+         * @param record a
+         * @param ctx b
+         * @param indexer c
          */
         @Override
         public void process(Tuple5<String, Integer, Double, Double, Integer> record, RuntimeContext ctx,
